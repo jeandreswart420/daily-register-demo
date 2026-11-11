@@ -1,0 +1,825 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Prototype of a school daily attendance register with SA-SAMS absenteeism codes. Demo data only.">
+<title>Daily Register (Prototype)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: phone-first app shell — sticky header with tabs, one working column, overlay sheet for office actions */
+:root{
+  --bg:#F2F5F4; --surface:#FFFFFF; --sunk:#E7ECEA; --ink:#15211D; --muted:#5A6A65; --line:#D5DEDA;
+  --accent:#1D5BA3; --accent-ink:#FFFFFF; --accent-soft:#E2ECF8;
+  --present:#1B7A47; --present-soft:#E1F2E8; --absent:#B0281F; --absent-soft:#FBE6E3;
+  --late:#9A6200; --late-soft:#FBF0DA; --out:#64479F; --out-soft:#EEE8F8;
+  --font:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0E1412; --surface:#17201D; --sunk:#1F2925; --ink:#E5ECE9; --muted:#97A6A1; --line:#2B3632;
+  --accent:#7EB0EE; --accent-ink:#0B1A2C; --accent-soft:#1B2A3D;
+  --present:#5DC48C; --present-soft:#173326; --absent:#F28B80; --absent-soft:#3A1D1A;
+  --late:#E8B24E; --late-soft:#352A13; --out:#B9A0F2; --out-soft:#2A2340; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1412; --surface:#17201D; --sunk:#1F2925; --ink:#E5ECE9; --muted:#97A6A1; --line:#2B3632;
+  --accent:#7EB0EE; --accent-ink:#0B1A2C; --accent-soft:#1B2A3D;
+  --present:#5DC48C; --present-soft:#173326; --absent:#F28B80; --absent-soft:#3A1D1A;
+  --late:#E8B24E; --late-soft:#352A13; --out:#B9A0F2; --out-soft:#2A2340; color-scheme:dark}
+*{box-sizing:border-box}
+html{color-scheme:light}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+.proto{background:var(--accent-soft);color:var(--ink);font-size:14px;padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.proto div{max-width:960px;margin:0 auto;display:flex;gap:8px 12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.proto button{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 10px;font-weight:700;font-size:14px}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.45}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-block:12px 4px;max-width:960px;margin:0 auto}
+.top h1{font-size:18px;margin:0;text-wrap:balance}
+.top .date{color:var(--muted);font-size:14px;white-space:nowrap}
+nav{display:flex;gap:4px;overflow-x:auto;max-width:960px;margin:0 auto;scrollbar-width:none}
+nav button{border:0;background:none;padding:10px 12px;border-bottom:3px solid transparent;color:var(--muted);font-weight:700;white-space:nowrap;position:relative}
+nav button[aria-current="page"]{color:var(--ink);border-bottom-color:var(--accent)}
+.badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--absent);color:var(--surface);font-size:12px;margin-left:6px}
+main{max-width:960px;margin:0 auto;padding-block:16px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:16px}
+h2{font-size:20px;margin:0;text-wrap:balance}
+h3{font-size:16px;margin:0}
+.muted{color:var(--muted)}
+.small{font-size:14px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.spread{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:grid;gap:12px;min-width:0}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:10px 14px;font-weight:700;min-height:44px}
+.btn:hover{background:var(--sunk)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{border-color:transparent;background:none;color:var(--accent);padding-inline:6px}
+.btn:disabled{opacity:.5;cursor:default}
+.code{font-family:var(--mono);font-weight:600;font-size:13px;letter-spacing:.02em}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 10px;font-size:13px;font-weight:700;white-space:nowrap}
+.c-present{background:var(--present-soft);color:var(--present)}
+.c-absent{background:var(--absent-soft);color:var(--absent)}
+.c-late{background:var(--late-soft);color:var(--late)}
+.c-out{background:var(--out-soft);color:var(--out)}
+.c-none{background:var(--sunk);color:var(--muted)}
+.c-info{background:var(--accent-soft);color:var(--accent)}
+label.f{display:grid;gap:4px;font-size:14px;color:var(--muted);font-weight:700}
+input[type=text],input[type=date],input[type=time],input[type=search],select,textarea{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 10px;min-height:44px;width:100%;min-width:0}
+textarea{min-height:64px;resize:vertical}
+
+/* register card */
+.progress{height:6px;background:var(--sunk);border-radius:3px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--accent);transition:width .2s}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px 16px;display:grid;gap:16px;text-align:center}
+.card .count{font-family:var(--mono);color:var(--muted);font-size:14px}
+.card .name{font-size:30px;font-weight:700;line-height:1.15;text-wrap:balance}
+.card .name small{display:block;font-size:16px;color:var(--muted);font-weight:400;margin-top:4px}
+.bigpresent{width:100%;min-height:64px;border-radius:12px;border:0;background:var(--present);color:var(--surface);font-size:20px;font-weight:700}
+.bigrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.bigpresent.not{background:var(--absent)}
+.bigpresent[aria-pressed="false"]{opacity:.9}
+.reasons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;text-align:left}
+.reason{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:10px;min-height:52px}
+.reason .code{background:var(--absent-soft);color:var(--absent);border-radius:6px;padding:2px 6px;min-width:42px;text-align:center}
+.reason.late .code{background:var(--late-soft);color:var(--late)}
+.reason[aria-pressed="true"]{border-color:var(--absent);box-shadow:inset 0 0 0 1px var(--absent)}
+.reason.late[aria-pressed="true"]{border-color:var(--late);box-shadow:inset 0 0 0 1px var(--late)}
+.reason span:last-child{font-size:14px;line-height:1.2}
+.cardnav{display:flex;justify-content:space-between;gap:8px}
+.note{border-radius:8px;padding:8px 12px;font-size:14px;text-align:left}
+
+/* lists */
+.list{display:grid;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+.li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-top:1px solid var(--line);min-height:52px;background:none;border-left:0;border-right:0;border-bottom:0;width:100%;text-align:left}
+.li:first-child{border-top:0}
+button.li:hover{background:var(--sunk)}
+.li .who{min-width:0;display:grid}
+.li .who b{overflow-wrap:anywhere}
+.li .who span{font-size:13px;color:var(--muted)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px;display:grid;gap:2px}
+.tile b{font-size:26px;font-variant-numeric:tabular-nums}
+.tile span{font-size:13px;color:var(--muted);font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+.tile.t-absent b{color:var(--absent)} .tile.t-late b{color:var(--late)} .tile.t-out b{color:var(--out)} .tile.t-present b{color:var(--present)}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);background:var(--sunk);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right}
+.dept{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:6px 2px 0}
+.classgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.classbtn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:14px 12px;text-align:left;display:grid;gap:2px;min-height:64px}
+.classbtn:hover{border-color:var(--accent)}
+.classbtn span{font-size:13px;color:var(--muted)}
+
+/* overlay sheet */
+.scrim{position:fixed;inset:0;background:rgba(10,16,14,.45);z-index:20;display:grid;align-items:end;justify-items:center}
+.sheet{background:var(--surface);width:min(560px,100%);max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;
+  padding:20px max(16px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:grid;gap:14px}
+@media (min-width:640px){.scrim{align-items:center}.sheet{border-radius:16px}}
+.opts{display:flex;flex-wrap:wrap;gap:6px}
+.opt{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 12px;font-size:14px;font-weight:700;min-height:40px}
+.opt[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--ink);color:var(--bg);padding:12px 16px;border-radius:10px;max-width:min(520px,calc(100% - 32px));font-weight:700;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.banner{border-radius:var(--r);padding:12px 14px;background:var(--late-soft);color:var(--ink);border:1px solid var(--line)}
+.alerts{display:grid;gap:6px}
+.alert{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;padding:10px 12px;border-radius:10px;background:var(--out-soft);border:1px solid var(--line)}
+.alert.in{background:var(--late-soft)}
+.empty{padding:28px 16px;text-align:center;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.setuprow{display:grid;grid-template-columns:1.2fr 1.2fr .9fr .9fr .6fr auto;gap:6px;align-items:center}
+.setuprow input,.setuprow select{min-height:38px;padding:6px 8px;font-size:14px}
+@media (max-width:640px){.setuprow{grid-template-columns:1fr 1fr;padding-bottom:10px;border-bottom:1px solid var(--line)}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+</head>
+<body>
+<div class="proto" role="note"><div><span><b>Prototype demo.</b> All learners are fictional. Changes are saved only in this browser.</span><button type="button" onclick="demoReset()">Reset demo data</button></div></div>
+<header>
+  <div class="top"><h1 id="schoolName">Daily Register</h1><span class="date" id="todayLabel"></span></div>
+  <nav id="tabs" aria-label="Sections"></nav>
+</header>
+<main id="app"><div class="empty">Loading the register…</div></main>
+<div id="overlay"></div>
+<div id="toast" class="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="demo/store.js"></script>
+<script>
+"use strict";
+const TZ="Africa/Johannesburg";
+const fmtDate=d=>d.toLocaleDateString("en-CA",{timeZone:TZ});
+const todayStr=()=>fmtDate(new Date());
+const nowTime=()=>new Date().toLocaleTimeString("en-GB",{timeZone:TZ,hour:"2-digit",minute:"2-digit"});
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ls={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+/* Absenteeism codes from the school's sheet. key = stored value, code = what goes into SA-SAMS. Ordered with the most used first. */
+const REASONS=[
+ {key:"A",code:"A",label:"No valid reason"},
+ {key:"S",code:"S",label:"Ill/Sick"},
+ {key:"MA",code:"MA",label:"Medical Appointment/Clinic"},
+ {key:"T",code:"T",label:"Access to transport"},
+ {key:"FR",code:"FR",label:"Family Responsibilities"},
+ {key:"L",code:"L",label:"Late for school",late:true},
+ {key:"AN",code:"AN",label:"Act of Nature"},
+ {key:"APP",code:"APP",label:"Appointment at Court"},
+ {key:"D",code:"D",label:"Death of family member"},
+ {key:"EC",code:"EC",label:"Exceptional Circumstances"},
+ {key:"H",code:"H",label:"Hospitalised"},
+ {key:"LF",code:"LF",label:"Lack of funds"},
+ {key:"P",code:"P",label:"Pregnancy/Giving Birth"},
+ {key:"SMT",code:"SMT",label:"Suspended by SMT"},
+ {key:"SGB",code:"SGB",label:"Suspended by SGB"},
+ {key:"EM",code:"EM",label:"Attending extra murals"},
+ {key:"DL",code:"DL",label:"Drivers Licence"},
+ {key:"OH",code:"OH",label:"On Holiday"},
+ {key:"PPI",code:"PPI",label:"Physical or Psychological illness"},
+ {key:"RCO",code:"R/CO",label:"Religious/Cultural Observances"},
+ {key:"SHA",code:"EC",label:"SASSA/Home Affairs"}
+];
+const REASON=Object.fromEntries(REASONS.map(r=>[r.key,r]));
+/* Not present, reason not known yet: goes to SA-SAMS as A until someone adds the reason */
+REASON.AB={key:"AB",code:"A",label:"Reason not known yet"};
+const OUT_REASONS=["Collected by parent/guardian","Sick – sent home","Medical appointment","Disciplinary","Hostel/transport","Other"];
+const IN_REASONS=["Transport late","Medical appointment","Family responsibilities","No valid reason","Other"];
+
+const S={db:null,user:null,uid:null,isOwner:false,ready:false,date:todayStr(),
+  tab:ls.get("reg-tab","register"),myClass:ls.get("reg-myclass",null),myClasses:ls.get("reg-myclasses",null),picker:false,
+  classes:[],classById:{},config:{},regs:{},moves:[],gotRegs:false,gotMoves:false,gotClasses:false,
+  local:{},cardIdx:{},regMode:{},seen:new Set(ls.get("reg-seen",[])),
+  search:"",expanded:null,rs:{classId:null,from:null,to:null,onlyPending:true,data:null,loading:false},reasonForm:null,log:{classId:null,from:null,to:null,data:null,loading:false,learner:""},
+  exp:{week:todayStr(),classId:"all"},setup:{classId:null,edit:null,upload:null},
+  unsubs:[],names:{},stale:false,readOnly:false};
+
+if(!Array.isArray(S.myClasses))S.myClasses=S.myClass?[S.myClass]:[];
+function saveMine(){ls.set("reg-myclasses",S.myClasses);ls.set("reg-myclass",S.myClass)}
+/* ---------- helpers ---------- */
+function learnerName(l,style){
+  const sur=l.surname||"",first=l.first||"",nick=l.nick?` (${l.nick})`:"";
+  if(style==="list") return `${sur}, ${first}${nick}`;
+  const surTitle=sur.toLowerCase().replace(/(^|[\s\-'])\p{L}/gu,m=>m.toUpperCase());
+  return `${first}${nick} ${surTitle}`;
+}
+function regFor(classId){return S.local[classId]||S.regs[classId]||null}
+function movesFor(lid,moves){return (moves||S.moves).filter(m=>m.learnerId===lid).sort((a,b)=>(a.time||"").localeCompare(b.time||""))}
+/* A sign-in counts as a late arrival unless the learner had already signed out earlier that day (returning). */
+function lateArrival(ms){let wasOut=false;for(const m of ms){if(m.type==="out")wasOut=true;else if(m.type==="in"&&!wasOut)return m}return null}
+/* Status of one learner on one day */
+function dayStatus(l,reg,ms){
+  const mark=reg&&reg.marks?reg.marks[l.id]:undefined;
+  const late=lateArrival(ms);
+  const last=ms.length?ms[ms.length-1]:null;
+  let kind,code="",label;
+  if(mark&&mark!=="PR"&&!REASON[mark]?.late){
+    if(late){kind="late";code="L";label=`Arrived ${late.time}`}
+    else{kind="absent";code=REASON[mark]?.code||mark;label=REASON[mark]?.label||mark}
+  }else if(mark==="L"||late){kind="late";code="L";label=late?`Arrived ${late.time}`:"Late"}
+  else if(mark==="PR"){kind="present";label="Present"}
+  else{kind="none";label="Not marked"}
+  let where=null;
+  if(last&&last.type==="out") where={kind:"out",label:`Signed out ${last.time}`};
+  return {kind,code,label,mark,where,late};
+}
+function chip(st){
+  if(st.where) return `<span class="chip c-out">${esc(st.where.label)}</span>`;
+  const cls={present:"c-present",absent:"c-absent",late:"c-late",none:"c-none"}[st.kind];
+  const code=st.kind==="absent"?`<span class="code">${esc(st.code)}</span>`:"";
+  return `<span class="chip ${cls}">${code}${esc(st.label)}</span>`;
+}
+function weekDates(anyDate){
+  const d=new Date(anyDate+"T12:00:00Z");const dow=(d.getUTCDay()+6)%7;d.setUTCDate(d.getUTCDate()-dow);
+  return [0,1,2,3,4].map(i=>{const x=new Date(d);x.setUTCDate(d.getUTCDate()+i);return x.toISOString().slice(0,10)});
+}
+function prettyDate(s){return new Date(s+"T12:00:00Z").toLocaleDateString("en-ZA",{weekday:"long",day:"numeric",month:"long",timeZone:"UTC"})}
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,4200)}
+function writeErr(e){
+  if(e&&e.code==="invalid_argument"){S.readOnly=true;toast("You can view this register but not change it. Ask the owner for edit access.")}
+  else if(e&&e.code==="quota_exceeded") toast("The register's storage is full. Tell the owner.");
+  else toast("Couldn't save just now. Check your connection and try again.");
+}
+/* one write at a time per document; newest data wins */
+const savers={};
+function saveDoc(path,data){const s=savers[path]||(savers[path]={busy:false,next:null});s.next=data;if(!s.busy)pump(path)}
+async function pump(path){const s=savers[path];s.busy=true;while(s.next){const d=s.next;s.next=null;
+  for(let i=0;i<2;i++){try{await S.db.doc(path).set(d);break}catch(e){if(e&&e.code==="unavailable"&&i===0){await new Promise(r=>setTimeout(r,600+Math.random()*800));continue}writeErr(e);break}}}
+  s.busy=false;}
+function savingDoc(path){const s=savers[path];return s&&(s.busy||s.next)}
+
+/* ---------- data ---------- */
+function subscribe(){
+  S.unsubs.forEach(u=>{try{u()}catch(e){}});S.unsubs=[];S.gotRegs=S.gotMoves=false;S.regs={};S.moves=[];
+  const timer=setTimeout(()=>{if(!S.gotClasses||!S.gotRegs){S.stale=true;render()}},10000);
+  const onErr=e=>{clearTimeout(timer);S.stale=true;render()};
+  S.unsubs.push(S.db.collection("classes").onSnapshot(q=>{
+    S.classes=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.dept||"").localeCompare(b.dept||"")||(a.order??0)-(b.order??0)||a.name.localeCompare(b.name));
+    S.classById=Object.fromEntries(S.classes.map(c=>[c.id,c]));S.gotClasses=true;if(!q.metadata.fromCache){S.stale=false;clearTimeout(timer)}render();
+  },onErr));
+  S.unsubs.push(S.db.doc("config/school").onSnapshot(d=>{S.config=d.exists?d.data():{};paintHeader()},()=>{}));
+  S.unsubs.push(S.db.collection("registers").where("date","==",S.date).onSnapshot(q=>{
+    const m={};q.docs.forEach(d=>{const v=d.data();m[v.classId]=v});S.regs=m;S.gotRegs=true;
+    for(const cid in S.local){if(!savingDoc(`registers/${S.date}_${cid}`)&&!S.local[cid]._dirty)delete S.local[cid]}
+    render();
+  },onErr));
+  let first=true;
+  S.unsubs.push(S.db.collection("movements").where("date","==",S.date).onSnapshot(q=>{
+    S.moves=q.docs.map(d=>({id:d.id,...d.data()}));S.gotMoves=true;
+    if(!first){q.docChanges().forEach(ch=>{const m=ch.doc.data();
+      if(ch.type==="added"&&m.classId===S.myClass&&m.by!==S.uid){const c=S.classById[m.classId];const l=c?.learners?.find(x=>x.id===m.learnerId);
+        toast(`${l?learnerName(l):"A learner"} ${m.type==="out"?"was signed out":"arrived"} at ${m.time}${m.reason?" – "+m.reason:""}`)}})}
+    first=false;render();
+  },onErr));
+}
+setInterval(()=>{const t=todayStr();if(t!==S.date&&S.db){S.date=t;S.local={};S.cardIdx={};S.regMode={};subscribe();paintHeader()}},60000);
+
+/* ---------- header & tabs ---------- */
+function unseenFor(cid){return S.moves.filter(m=>m.classId===cid&&m.by!==S.uid&&!S.seen.has(m.id)).length}
+function unseenCount(){return S.myClass?unseenFor(S.myClass):0}
+function paintHeader(){
+  document.getElementById("schoolName").textContent=S.config.name||"Daily Register";
+  document.getElementById("todayLabel").textContent=prettyDate(S.date);
+  const tabs=[["register","Register"],["reasons","Absence reasons"],["overview","Overview"],["log","Class log"],["export","SA-SAMS"]];
+  if(S.isOwner)tabs.push(["setup","Setup"]);
+  if(!tabs.some(t=>t[0]===S.tab))S.tab="register";
+  const n=unseenCount();
+  document.getElementById("tabs").innerHTML=tabs.map(([k,v])=>`<button data-act="tab" data-k="${k}" ${S.tab===k?'aria-current="page"':""}>${v}${k==="register"&&n?`<span class="badge" aria-label="${n} new">${n}</span>`:""}</button>`).join("");
+}
+
+/* ---------- render ---------- */
+function render(){
+  paintHeader();
+  const app=document.getElementById("app");
+  const ae=document.activeElement,fid=ae&&ae.id,sel=fid&&ae.selectionStart!=null?[ae.selectionStart,ae.selectionEnd]:null;
+  if(S.tab==="setup"&&S.setup.edit&&app.dataset.tab==="setup"&&!render.force){return}
+  render.force=false;
+  let html="";
+  if(!S.db) html=noDb();
+  else if(!S.gotClasses) html=`<div class="empty">Loading the register…</div>${S.stale?`<div class="banner">Can't reach the register yet. Check your connection; it will load by itself when it can.</div>`:""}`;
+  else if(!S.classes.length&&S.tab!=="setup") html=S.isOwner?`<div class="panel"><h2>No classes yet</h2><p class="muted">Add classes and learners in Setup.</p></div>`:noAccess();
+  else html=({register:viewRegister,reasons:viewReasons,overview:viewOverview,log:viewLog,export:viewExport,setup:viewSetup}[S.tab]||viewRegister)();
+  if(S.stale&&S.gotClasses) html=`<div class="banner">Showing the last saved copy. New changes will appear when the connection is back.</div>`+html;
+  app.innerHTML=html;app.dataset.tab=S.tab;
+  if(fid){const el=document.getElementById(fid);if(el){el.focus();if(sel&&el.setSelectionRange)try{el.setSelectionRange(sel[0],sel[1])}catch(e){}}}
+}
+function noAccess(){return `<div class="panel"><h2>You don't have access to the register yet</h2><p>To protect learner information, the class lists only open for people invited by email as an <b>Editor</b>.</p><ol class="muted"><li>Ask the person who shared this to open <b>Share</b>, invite your email address, and set it to <b>Editor</b>.</li><li>Open this link again while signed in to Claude with that same email address.</li></ol></div>`}
+function noDb(){return `<div class="panel"><h2>Sign in to use the register</h2><p class="muted">This register keeps learner attendance for the school, so it only opens for people the owner has shared it with. The demo store didn't start. Reload the page.</p></div>`}
+
+/* ----- Register tab (teacher) ----- */
+function regState(cid){const c=S.classById[cid];const r=regFor(cid);const n=(c?.learners||[]).length;const done=r?Object.keys(r.marks||{}).length:0;
+  return r?.status==="submitted"?{cls:"c-present",txt:"Done"}:done?{cls:"c-late",txt:`${Math.min(done,n)}/${n}`}:{cls:"c-none",txt:"Not started"}}
+function classPicker(){
+  const groups={};S.classes.forEach(c=>{(groups[c.dept||"Classes"]=groups[c.dept||"Classes"]||[]).push(c)});
+  const back=S.classById[S.myClass];
+  return `<div class="panel"><div class="spread"><h2>All classes</h2>${back?`<button class="btn" data-act="closepicker">Back to ${esc(back.name)}</button>`:""}</div>
+   <p class="muted small">Tap any class to open its register. Teachers covering for a colleague, and the office doing late-comers, can mark any class.</p>
+   ${Object.entries(groups).map(([g,cs])=>`<div class="dept">${esc(g)}</div><div class="classgrid">${cs.map(c=>{const s=regState(c.id);return `<button class="classbtn" data-act="pickclass" data-id="${c.id}"><b>${esc(c.name)}</b><span>${(c.learners||[]).length} learners</span><span class="chip ${s.cls}" style="justify-self:start;margin-top:4px">${s.txt}</span></button>`}).join("")}</div>`).join("")}</div>`;
+}
+function classBar(){
+  return `<div class="row"><button class="btn" data-act="changeclass">← All classes</button></div>`;
+}
+function viewRegister(){
+  const c=S.classById[S.myClass];
+  if(!c||S.picker) return classPicker();
+  return classBar()+viewClassRegister(c);
+}
+function viewClassRegister(c){
+  const L=c.learners||[];const reg=regFor(c.id)||{marks:{}};const marks=reg.marks||{};
+  const done=L.filter(l=>marks[l.id]).length;
+  const mode=S.regMode[c.id]||(reg.status==="submitted"?"summary":(done===L.length&&L.length?"summary":"cards"));
+  const myMoves=S.moves.filter(m=>m.classId===c.id).sort((a,b)=>(b.time||"").localeCompare(a.time||""));
+  const unseen=myMoves.filter(m=>m.by!==S.uid&&!S.seen.has(m.id));
+  let h=`<div class="spread"><div><h2>${esc(c.name)}</h2><span class="muted small">${L.length} learners${c.sasams&&c.sasams!==c.name?` · SA-SAMS class ${esc(c.sasams)}`:""}</span></div>
+    <div class="row">${reg.status==="submitted"?`<span class="chip c-present">Submitted ${esc(reg.submittedTime||"")}</span>`:done?`<span class="chip c-late">In progress ${done}/${L.length}</span>`:`<span class="chip c-none">Not started</span>`}
+    </div></div>`;
+  if(unseen.length) h+=`<div class="alerts">${unseen.map(m=>{const l=L.find(x=>x.id===m.learnerId);return `<div class="alert ${m.type}"><div><b>${esc(l?learnerName(l):"Learner")}</b> ${m.type==="out"?"signed out":"arrived"} at ${esc(m.time)}<div class="small muted">${esc([m.reason,m.collectedBy?`collected by ${m.collectedBy}`:"",m.note].filter(Boolean).join(" · "))}</div></div></div>`}).join("")}<button class="btn" data-act="seen">Got it</button></div>`;
+  if(!L.length) return h+`<div class="panel empty">This class has no learners yet.</div>`;
+  if(mode==="cards"){
+    let i=S.cardIdx[c.id];if(i==null){i=L.findIndex(l=>!marks[l.id]);if(i<0)i=0}
+    i=Math.max(0,Math.min(L.length-1,i));S.cardIdx[c.id]=i;
+    const l=L[i];const cur=marks[l.id];const st=dayStatus(l,reg,movesFor(l.id));
+    h+=`<div class="progress" aria-hidden="true"><i style="width:${Math.round(done/L.length*100)}%"></i></div>
+    <div class="card">
+      <div class="count">${i+1} of ${L.length}</div>
+      <div class="name">${esc(l.first)}${l.nick?` <span class="muted">(${esc(l.nick)})</span>`:""}<small>${esc(l.surname)}</small></div>
+      ${st.where||st.late?`<div class="note c-info">Office: ${esc(st.where?st.where.label:st.label)}</div>`:""}
+      <div class="bigrow"><button class="bigpresent" data-act="mark" data-k="PR" aria-pressed="${cur==="PR"}">${cur==="PR"?"✓ Present":"Present"}</button><button class="bigpresent not" data-act="mark" data-k="AB" aria-pressed="${cur==="AB"}">${cur==="AB"?"✓ Not present":"Not present"}</button></div>
+      <div class="muted small" style="text-align:left">Not present and you know why? Choose the reason instead. If you don't know yet, tap Not present and add the reason later under Absence reasons.</div>
+      <div class="reasons">${REASONS.map(r=>`<button class="reason${r.late?" late":""}" data-act="mark" data-k="${r.key}" aria-pressed="${cur===r.key}"><span class="code">${esc(r.code)}</span><span>${esc(r.label)}</span></button>`).join("")}</div>
+      <div class="cardnav"><button class="btn" data-act="prev" ${i===0?"disabled":""}>Back</button><button class="btn" data-act="review">See whole class</button><button class="btn" data-act="next" ${i===L.length-1?"disabled":""}>Skip</button></div>
+    </div>`;
+  }else{
+    const counts={present:0,absent:0,late:0,none:0};
+    const rows=L.map((l,i)=>{const st=dayStatus(l,reg,movesFor(l.id));counts[st.kind]++;return `<button class="li" data-act="jump" data-i="${i}"><span class="who"><b>${esc(learnerName(l,"list"))}</b>${st.where?`<span>${esc(st.where.label)}</span>`:""}</span>${chip({...st,where:null})}</button>`}).join("");
+    h+=`<div class="tiles"><div class="tile t-present"><b>${counts.present}</b><span>Present</span></div><div class="tile t-absent"><b>${counts.absent}</b><span>Absent</span></div><div class="tile t-late"><b>${counts.late}</b><span>Late</span></div><div class="tile"><b>${counts.none}</b><span>Not marked</span></div></div>
+    <div class="list">${rows}</div>
+    <div class="row">${reg.status==="submitted"?`<button class="btn" data-act="editreg">Change register</button>`:`<button class="btn primary" data-act="submit" ${counts.none?"disabled":""}>Submit register</button><button class="btn" data-act="cards">Back to cards</button>`}
+    ${counts.none&&reg.status!=="submitted"?`<span class="muted small">Mark every learner before submitting. Tap a name to mark it.</span>`:""}</div>`;
+  }
+  if(myMoves.length&&!unseen.length) h+=`<div class="panel"><h3>Today from the office</h3><div class="list">${myMoves.map(m=>{const l=L.find(x=>x.id===m.learnerId);return `<div class="li"><span class="who"><b>${esc(l?learnerName(l,"list"):"Learner")}</b><span>${esc([m.reason,m.collectedBy?`collected by ${m.collectedBy}`:"",m.note].filter(Boolean).join(" · "))}</span></span><span class="chip ${m.type==="out"?"c-out":"c-late"}">${m.type==="out"?"Out":"In"} ${esc(m.time)}</span></div>`}).join("")}</div></div>`;
+  return h;
+}
+function setMark(classId,lid,key){
+  if(S.readOnly){toast("You can view this register but not change it.");return}
+  const base=regFor(classId)||{date:S.date,classId,status:"draft",marks:{}};
+  const reg={...base,marks:{...(base.marks||{}),[lid]:key},date:S.date,classId,updatedAt:new Date().toISOString(),by:S.uid||null};
+  delete reg._dirty;
+  if(reg.status==="submitted"){reg.status="submitted";reg.changedAfterSubmit=true}
+  S.local[classId]={...reg,_dirty:true};
+  clearTimeout(setMark._t[classId]);
+  setMark._t[classId]=setTimeout(()=>{const r={...S.local[classId]};delete r._dirty;S.local[classId]._dirty=false;saveDoc(`registers/${S.date}_${classId}`,r)},700);
+}
+setMark._t={};
+function flushReg(classId){clearTimeout(setMark._t[classId]);const r={...S.local[classId]};delete r._dirty;if(S.local[classId])S.local[classId]._dirty=false;saveDoc(`registers/${S.date}_${classId}`,r)}
+
+/* ----- Overview tab (office) ----- */
+function allStatuses(){
+  const out=[];S.classes.forEach(c=>{const reg=regFor(c.id);(c.learners||[]).forEach(l=>out.push({c,l,st:dayStatus(l,reg,movesFor(l.id))}))});return out;
+}
+function viewOverview(){
+  const all=allStatuses();const t={roll:all.length,present:0,absent:0,late:0,none:0,out:0};
+  all.forEach(x=>{t[x.st.kind]++;if(x.st.where)t.out++});
+  const sub=S.classes.filter(c=>regFor(c.id)?.status==="submitted").length;
+  let h=`<div class="tiles">
+    <div class="tile"><b>${t.roll}</b><span>On roll</span></div>
+    <div class="tile t-present"><b>${t.present+t.late-t.out}</b><span>At school now</span></div>
+    <div class="tile t-absent"><b>${t.absent}</b><span>Absent</span></div>
+    <div class="tile t-late"><b>${t.late}</b><span>Late</span></div>
+    <div class="tile t-out"><b>${t.out}</b><span>Signed out</span></div>
+    <div class="tile"><b>${sub}/${S.classes.length}</b><span>Registers in</span></div></div>
+  <div class="panel"><div class="spread"><h3>Sign a learner in or out</h3></div>
+    <input type="search" id="ovSearch" placeholder="Type a learner's name" value="${esc(S.search)}" autocomplete="off">
+    ${S.search.trim().length>=2?searchResults(all):`<span class="muted small">Type at least two letters. Late arrivals and early departures show up for the class teacher straight away.</span>`}
+  </div>`;
+  const mv=[...S.moves].sort((a,b)=>(b.time||"").localeCompare(a.time||""));
+  h+=`<div class="panel"><h3>Today's sign-ins and sign-outs</h3>${mv.length?`<div class="list">${mv.map(m=>{const c=S.classById[m.classId];const l=c?.learners?.find(x=>x.id===m.learnerId);return `<div class="li"><span class="who"><b>${esc(l?learnerName(l,"list"):"Learner")}</b><span>${esc([c?.name,m.reason,m.collectedBy?`collected by ${m.collectedBy}`:"",m.note].filter(Boolean).join(" · "))}</span></span><span class="chip ${m.type==="out"?"c-out":"c-late"}">${m.type==="out"?"Out":"In"} ${esc(m.time)}</span></div>`}).join("")}</div>`:`<span class="muted small">None yet today.</span>`}</div>`;
+  h+=`<div class="panel"><h3>Classes</h3><div class="tablewrap"><table><thead><tr><th>Class</th><th>Register</th><th class="num">Present</th><th class="num">Absent</th><th class="num">Late</th><th class="num">Out</th></tr></thead><tbody>${S.classes.map(c=>{
+    const xs=all.filter(x=>x.c.id===c.id);const k={present:0,absent:0,late:0,none:0,out:0};xs.forEach(x=>{k[x.st.kind]++;if(x.st.where)k.out++});
+    const r=regFor(c.id);const stat=r?.status==="submitted"?`<span class="chip c-present">In ${esc(r.submittedTime||"")}</span>`:r&&Object.keys(r.marks||{}).length?`<span class="chip c-late">Busy</span>`:`<span class="chip c-none">Not yet</span>`;
+    const open=S.expanded===c.id;
+    return `<tr><td><button class="btn ghost" data-act="expand" data-id="${c.id}" aria-expanded="${open}">${esc(c.name)}</button></td><td>${stat}</td><td class="num">${k.present+k.late}</td><td class="num">${k.absent}</td><td class="num">${k.late}</td><td class="num">${k.out}</td></tr>${open?`<tr><td colspan="6"><div class="list">${xs.map(x=>`<button class="li" data-act="office" data-c="${c.id}" data-l="${x.l.id}"><span class="who"><b>${esc(learnerName(x.l,"list"))}</b></span>${chip(x.st)}</button>`).join("")}</div></td></tr>`:""}`}).join("")}</tbody></table></div></div>`;
+  return h;
+}
+function searchResults(all){
+  const q=S.search.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+  const hits=all.filter(x=>(`${x.l.first} ${x.l.surname} ${x.l.nick||""} ${x.l.surname} ${x.l.first}`).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").includes(q)).slice(0,12);
+  if(!hits.length) return `<span class="muted small">No learner matches “${esc(S.search)}”.</span>`;
+  return `<div class="list">${hits.map(x=>`<button class="li" data-act="office" data-c="${x.c.id}" data-l="${x.l.id}"><span class="who"><b>${esc(learnerName(x.l,"list"))}</b><span>${esc(x.c.name)}</span></span>${chip(x.st)}</button>`).join("")}</div>`;
+}
+function openOffice(classId,lid,type){
+  const c=S.classById[classId];const l=c.learners.find(x=>x.id===lid);const st=dayStatus(l,regFor(classId),movesFor(lid));
+  const suggested=type||(st.where?"in":(st.kind==="absent"||st.kind==="none")?"in":"out");
+  S.officeForm={classId,lid,type:suggested,reason:"",time:nowTime(),collectedBy:"",note:""};
+  paintOffice();
+}
+function paintOffice(){
+  const f=S.officeForm,o=document.getElementById("overlay");
+  if(!f){o.innerHTML="";return}
+  const c=S.classById[f.classId];const l=c.learners.find(x=>x.id===f.lid);const st=dayStatus(l,regFor(f.classId),movesFor(f.lid));
+  const reasons=f.type==="out"?OUT_REASONS:IN_REASONS;
+  o.innerHTML=`<div class="scrim" data-act="closeoffice"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="offTitle" data-stop>
+    <div class="spread"><div><h2 id="offTitle">${esc(learnerName(l))}</h2><span class="muted small">${esc(c.name)} · ${st.where?esc(st.where.label):esc(st.label)}</span></div><button class="btn ghost" data-act="closeoffice">Close</button></div>
+    <div class="opts" role="group" aria-label="Action"><button class="opt" data-act="otype" data-k="in" aria-pressed="${f.type==="in"}">Sign in (arrived)</button><button class="opt" data-act="otype" data-k="out" aria-pressed="${f.type==="out"}">Sign out (leaving)</button></div>
+    ${f.type==="in"&&st.where?`<div class="note c-info">Signing back in after being signed out keeps this learner present. It doesn't count as late.</div>`:""}
+    ${f.type==="out"?`<div class="note c-info">The learner stays present on the SA-SAMS register for today, because they were at school this morning.</div>`:""}
+    <label class="f">Time<input type="time" id="oTime" value="${esc(f.time)}"></label>
+    <div class="f" style="display:grid;gap:6px"><span class="muted small" style="font-weight:700">Reason</span><div class="opts">${reasons.map(r=>`<button class="opt" data-act="oreason" data-k="${esc(r)}" aria-pressed="${f.reason===r}">${esc(r)}</button>`).join("")}</div></div>
+    ${f.type==="out"?`<label class="f">Collected by<input type="text" id="oBy" value="${esc(f.collectedBy)}" placeholder="Name and relationship"></label>`:""}
+    <label class="f">Note (optional)<textarea id="oNote">${esc(f.note)}</textarea></label>
+    <button class="btn primary" data-act="osave" ${f.reason?"":"disabled"}>${f.type==="out"?"Sign out":"Sign in"} ${esc(l.first)}</button>
+  </div></div>`;
+}
+async function saveOffice(){
+  const f=S.officeForm;if(!f||!f.reason)return;
+  if(S.readOnly){toast("You can view this register but not change it.");return}
+  const c=S.classById[f.classId];const l=c.learners.find(x=>x.id===f.lid);
+  const doc={date:S.date,classId:f.classId,learnerId:f.lid,type:f.type,time:f.time||nowTime(),reason:f.reason,note:f.note.trim(),collectedBy:f.type==="out"?f.collectedBy.trim():"",at:new Date().toISOString(),by:S.uid||null};
+  const btn=document.querySelector('[data-act="osave"]');if(btn)btn.disabled=true;
+  try{await S.db.collection("movements").add(doc);S.officeForm=null;paintOffice();toast(`${learnerName(l)} ${f.type==="out"?"signed out":"signed in"} at ${doc.time}. ${c.name}'s teacher can see it now.`)}
+  catch(e){if(btn)btn.disabled=false;writeErr(e)}
+}
+
+/* ----- Class log (teacher follow-up) ----- */
+function learnerStats(l,regs,moves){
+  let absent=0,late=0;const absDays=[];
+  regs.forEach(r=>{const ms=moves.filter(m=>m.learnerId===l.id&&m.date===r.date).sort((a,b)=>(a.time||"").localeCompare(b.time||""));
+    const st=dayStatus(l,r,ms);if(st.kind==="absent"){absent++;absDays.push(`${r.date.slice(5)} ${st.code}`)}if(st.kind==="late")late++});
+  const outs=moves.filter(m=>m.learnerId===l.id&&m.type==="out").length;
+  const marked=regs.filter(r=>r.marks&&r.marks[l.id]).length;
+  return {l,absent,late,outs,marked,absDays,pct:marked?Math.round((marked-absent)/marked*1000)/10:null};
+}
+/* best attendance first; fewer absences breaks ties */
+const byBest=(a,b)=>(b.pct??-1)-(a.pct??-1)||a.absent-b.absent||a.late-b.late;
+function ranks(list){let r=0;return list.map((x,i)=>{if(i===0||x.pct!==list[i-1].pct)r=i+1;return r})}
+const pctTxt=p=>p==null?"–":(Number.isInteger(p)?p:p.toFixed(1))+"%";
+function viewLog(){
+  const g=S.log;if(!g.classId)g.classId=S.myClass||S.classes[0]?.id;
+  if(!g.to)g.to=S.date;if(!g.from){const d=new Date(S.date+"T12:00:00Z");d.setUTCDate(d.getUTCDate()-30);g.from=d.toISOString().slice(0,10)}
+  const all=g.classId==="all";const c=all?null:S.classById[g.classId];
+  let h=`<div class="panel"><h2>Class log</h2><p class="muted small">Attendance, late arrivals and sign-outs for one class or the whole school, ranked from best attendance to worst.</p>
+   <div class="grid2"><label class="f">Class<select id="logClass"><option value="all" ${all?"selected":""}>All classes</option>${S.classes.map(x=>`<option value="${x.id}" ${x.id===g.classId?"selected":""}>${esc(x.name)}</option>`).join("")}</select></label>
+   <label class="f">From<input type="date" id="logFrom" value="${g.from}"></label><label class="f">To<input type="date" id="logTo" value="${g.to}"></label>
+   ${all?"":`<label class="f">Learner<select id="logLearner"><option value="">Whole class</option>${(c?.learners||[]).map(l=>`<option value="${l.id}" ${g.learner===l.id?"selected":""}>${esc(learnerName(l,"list"))}</option>`).join("")}</select></label>`}</div>
+   <div class="row"><button class="btn primary" data-act="loadlog">Show log</button></div></div>`;
+  if(g.loading) return h+`<div class="empty">Loading…</div>`;
+  const fresh=g.data&&g.data.classId===g.classId&&(!all||(g.data.from<=g.from&&g.data.to>=g.to));
+  if(!fresh) return h+`<div class="empty">Choose a class and dates, then tap Show log.</div>`;
+  const regs=g.data.regs.filter(r=>r.date>=g.from&&r.date<=g.to);
+  const moves=g.data.moves.filter(m=>m.date>=g.from&&m.date<=g.to);
+  return h+(all?logAll(regs,moves):logClass(c,regs,moves));
+}
+function logAll(regs,moves){
+  const classRows=[],learnerRows=[];
+  S.classes.forEach(c=>{
+    const rc=regs.filter(r=>r.classId===c.id),mc=moves.filter(m=>m.classId===c.id);
+    const st=(c.learners||[]).map(l=>({...learnerStats(l,rc,mc),c}));learnerRows.push(...st);
+    const marked=st.reduce((n,x)=>n+x.marked,0),absent=st.reduce((n,x)=>n+x.absent,0);
+    classRows.push({c,days:new Set(rc.map(r=>r.date)).size,marked,absent,late:st.reduce((n,x)=>n+x.late,0),outs:st.reduce((n,x)=>n+x.outs,0),pct:marked?Math.round((marked-absent)/marked*1000)/10:null});
+  });
+  classRows.sort(byBest);learnerRows.sort((a,b)=>byBest(a,b)||a.l.surname.localeCompare(b.l.surname));
+  const totM=classRows.reduce((n,x)=>n+x.marked,0),totA=classRows.reduce((n,x)=>n+x.absent,0);
+  const cr=ranks(classRows),lr=ranks(learnerRows);
+  const noData=classRows.filter(x=>x.pct==null).length;
+  return `<div class="tiles"><div class="tile t-present"><b>${pctTxt(totM?Math.round((totM-totA)/totM*1000)/10:null)}</b><span>School attendance</span></div>
+    <div class="tile t-absent"><b>${totA}</b><span>Learner-days absent</span></div>
+    <div class="tile t-late"><b>${classRows.reduce((n,x)=>n+x.late,0)}</b><span>Late arrivals</span></div>
+    <div class="tile t-out"><b>${classRows.reduce((n,x)=>n+x.outs,0)}</b><span>Sign-outs</span></div></div>
+  <div class="panel"><div class="spread"><h3>Classes, best attendance to worst</h3>${noData?`<span class="muted small">${noData} class${noData===1?" has":"es have"} no registers in this period</span>`:""}</div>
+   <div class="tablewrap"><table><thead><tr><th class="num">#</th><th>Class</th><th class="num">Attendance</th><th class="num">School days</th><th class="num">Absences</th><th class="num">Late</th><th class="num">Signed out</th></tr></thead><tbody>
+   ${classRows.map((x,i)=>`<tr><td class="num">${x.pct==null?"–":cr[i]}</td><td><button class="btn ghost" data-act="logclass" data-id="${x.c.id}">${esc(x.c.name)}</button></td><td class="num"><b>${pctTxt(x.pct)}</b></td><td class="num">${x.days}</td><td class="num">${x.absent}</td><td class="num">${x.late}</td><td class="num">${x.outs}</td></tr>`).join("")}
+   </tbody></table></div><span class="muted small">Tap a class to see its learners.</span></div>
+  <div class="panel"><h3>All learners, best attendance to worst</h3>
+   <div class="tablewrap"><table><thead><tr><th class="num">#</th><th>Learner</th><th>Class</th><th class="num">Attendance</th><th class="num">Absent</th><th class="num">Late</th><th class="num">Signed out</th></tr></thead><tbody>
+   ${learnerRows.map((x,i)=>`<tr><td class="num">${x.pct==null?"–":lr[i]}</td><td>${esc(learnerName(x.l,"list"))}</td><td>${esc(x.c.name)}</td><td class="num">${pctTxt(x.pct)}</td><td class="num">${x.absent}</td><td class="num">${x.late}</td><td class="num">${x.outs}</td></tr>`).join("")}
+   </tbody></table></div></div>`;
+}
+function logClass(c,regs,moves){
+  const g=S.log;const days=new Set(regs.map(r=>r.date)).size;
+  let learners=c.learners||[];if(g.learner)learners=learners.filter(l=>l.id===g.learner);
+  const stats=learners.map(l=>learnerStats(l,regs,moves)).sort((a,b)=>byBest(a,b)||a.l.surname.localeCompare(b.l.surname));
+  const rk=ranks(stats);
+  let h=`<div class="panel"><div class="spread"><h3>${esc(c.name)} · ${days} school day${days===1?"":"s"} on record</h3><span class="muted small">Best attendance first</span></div>
+   <div class="tablewrap"><table><thead><tr><th class="num">#</th><th>Learner</th><th class="num">Attendance</th><th class="num">Absent</th><th class="num">Late</th><th class="num">Signed out</th><th>Absent days</th></tr></thead><tbody>
+   ${stats.map((s,i)=>`<tr><td class="num">${s.pct==null?"–":rk[i]}</td><td>${esc(learnerName(s.l,"list"))}</td><td class="num">${pctTxt(s.pct)}</td><td class="num">${s.absent}</td><td class="num">${s.late}</td><td class="num">${s.outs}</td><td class="small"><span class="code">${esc(s.absDays.join(", "))}</span></td></tr>`).join("")}
+   </tbody></table></div></div>`;
+  const ev=moves.filter(m=>!g.learner||m.learnerId===g.learner).sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));
+  h+=`<div class="panel"><h3>Sign-ins and sign-outs</h3>${ev.length?`<div class="tablewrap"><table><thead><tr><th>Date</th><th>Time</th><th>Learner</th><th>What</th><th>Reason</th><th>Details</th><th>Recorded by</th></tr></thead><tbody>${ev.map(m=>{const l=c.learners.find(x=>x.id===m.learnerId);const late=m.type==="in"&&lateArrival(moves.filter(x=>x.learnerId===m.learnerId&&x.date===m.date).sort((a,b)=>a.time.localeCompare(b.time)))===m;
+     return `<tr><td>${m.date}</td><td>${esc(m.time)}</td><td>${esc(l?learnerName(l,"list"):"")}</td><td><span class="chip ${m.type==="out"?"c-out":"c-late"}">${m.type==="out"?"Signed out":late?"Late arrival":"Returned"}</span></td><td>${esc(m.reason)}</td><td>${esc([m.collectedBy?`Collected by ${m.collectedBy}`:"",m.note].filter(Boolean).join(" · "))}</td><td>${esc(S.names[m.by]||"")}</td></tr>`}).join("")}</tbody></table></div>`:`<span class="muted small">No sign-ins or sign-outs in this period.</span>`}</div>`;
+  return h;
+}
+async function loadLog(){
+  const g=S.log;g.loading=true;render();
+  try{
+    let r,m;
+    if(g.classId==="all"){
+      [r,m]=await Promise.all([S.db.collection("registers").where("date",">=",g.from).where("date","<=",g.to).get(),S.db.collection("movements").where("date",">=",g.from).where("date","<=",g.to).get()]);
+    }else{
+      [r,m]=await Promise.all([S.db.collection("registers").where("classId","==",g.classId).get(),S.db.collection("movements").where("classId","==",g.classId).get()]);
+    }
+    g.data={classId:g.classId,from:g.from,to:g.to,regs:r.docs.map(d=>d.data()),moves:m.docs.map(d=>({id:d.id,...d.data()}))};
+    const ids=[...new Set(g.data.moves.map(x=>x.by).filter(Boolean))];
+    if(ids.length&&S.user&&S.user.profiles){try{const ps=await S.user.profiles(ids);ids.forEach(id=>S.names[id]=ps[id]?.name||"Someone")}catch(e){}}
+  }catch(e){toast(e&&e.code==="resource_exhausted"?"That period is too long to load at once. Choose a shorter date range.":"Couldn't load the log. Try again.")}
+  g.loading=false;render();
+}
+/* ----- Absence reasons (fill in later) ----- */
+function viewReasons(){
+  const g=S.rs;if(g.classId==null)g.classId=S.myClass||"all";
+  if(!g.to)g.to=S.date;if(!g.from){const d=new Date(S.date+"T12:00:00Z");d.setUTCDate(d.getUTCDate()-14);g.from=d.toISOString().slice(0,10)}
+  let h=`<div class="panel"><h2>Absence reasons</h2><p class="muted small">Learners marked <b>Not present</b> go to SA-SAMS as A until a reason is added. When the learner is back, find the day here and fill in why they were absent.</p>
+   <div class="grid2"><label class="f">Class<select id="rsClass"><option value="all" ${g.classId==="all"?"selected":""}>All classes</option>${S.classes.map(x=>`<option value="${x.id}" ${x.id===g.classId?"selected":""}>${esc(x.name)}</option>`).join("")}</select></label>
+   <label class="f">From<input type="date" id="rsFrom" value="${g.from}"></label><label class="f">To<input type="date" id="rsTo" value="${g.to}"></label></div>
+   <div class="row"><button class="btn primary" data-act="loadreasons">Show absences</button>
+   <div class="opts" role="group" aria-label="Which absences"><button class="opt" data-act="rsonly" data-k="1" aria-pressed="${g.onlyPending}">Reason needed</button><button class="opt" data-act="rsonly" data-k="0" aria-pressed="${!g.onlyPending}">All absences</button></div></div></div>`;
+  if(g.loading) return h+`<div class="empty">Loading…</div>`;
+  if(!g.data||!(g.data.from<=g.from&&g.data.to>=g.to)){if(S.db&&!g.failed)setTimeout(()=>{if(S.tab==="reasons"&&!g.loading)loadReasons()},0);return h+`<div class="empty">${g.failed?"Couldn't load the absences. Tap Show absences to try again.":"Loading…"}</div>`}
+  const items=[];
+  g.data.regs.forEach(r=>{
+    if(r.date<g.from||r.date>g.to)return;if(g.classId!=="all"&&r.classId!==g.classId)return;
+    const c=S.classById[r.classId];if(!c)return;
+    (c.learners||[]).forEach(l=>{const ms=g.data.moves.filter(m=>m.learnerId===l.id&&m.date===r.date).sort((a,b)=>(a.time||"").localeCompare(b.time||""));
+      const st=dayStatus(l,r,ms);if(st.kind!=="absent")return;
+      const pending=st.mark==="AB";if(g.onlyPending&&!pending)return;
+      items.push({r,c,l,st,pending})});
+  });
+  items.sort((a,b)=>b.r.date.localeCompare(a.r.date)||(a.c.order??0)-(b.c.order??0)||a.c.name.localeCompare(b.c.name)||a.l.surname.localeCompare(b.l.surname));
+  const pendingN=items.filter(x=>x.pending).length;
+  if(!items.length) return h+`<div class="panel empty">${g.onlyPending?"No absences are waiting for a reason in this period.":"No absences in this period."}</div>`;
+  let lastDate="",body="";
+  items.forEach(x=>{if(x.r.date!==lastDate){if(lastDate)body+=`</div>`;body+=`<div class="dept">${esc(prettyDate(x.r.date))}</div><div class="list">`;lastDate=x.r.date}
+    body+=`<button class="li" data-act="rsopen" data-d="${x.r.date}" data-c="${x.c.id}" data-l="${x.l.id}"><span class="who"><b>${esc(learnerName(x.l,"list"))}</b><span>${esc(x.c.name)}</span></span>${x.pending?`<span class="chip c-late">Reason needed</span>`:`<span class="chip c-absent"><span class="code">${esc(x.st.code)}</span>${esc(x.st.label)}</span>`}</button>`});
+  body+=`</div>`;
+  return h+`<div class="spread"><h3>${pendingN} absence${pendingN===1?"":"s"} waiting for a reason</h3><span class="muted small">Tap a learner to add or change the reason</span></div>${body}`;
+}
+async function loadReasons(){
+  const g=S.rs;if(g.from>g.to){toast("The From date must be before the To date.");return}
+  g.loading=true;g.failed=false;render();
+  try{
+    const [r,m]=await Promise.all([S.db.collection("registers").where("date",">=",g.from).where("date","<=",g.to).get(),S.db.collection("movements").where("date",">=",g.from).where("date","<=",g.to).get()]);
+    g.data={from:g.from,to:g.to,regs:r.docs.map(d=>d.data()),moves:m.docs.map(d=>d.data())};
+  }catch(e){g.failed=true;toast(e&&e.code==="resource_exhausted"?"That period is too long to load at once. Choose a shorter date range.":`Couldn't load the absences (${(e&&(e.code||e.message))||"error"}). Try again.`)}
+  g.loading=false;render();
+}
+function paintReason(){
+  const f=S.reasonForm,o=document.getElementById("overlay");
+  if(!f){o.innerHTML="";return}
+  const c=S.classById[f.classId];const l=c.learners.find(x=>x.id===f.lid);
+  o.innerHTML=`<div class="scrim" data-act="closereason"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rsTitle" data-stop>
+    <div class="spread"><div><h2 id="rsTitle">${esc(learnerName(l))}</h2><span class="muted small">${esc(c.name)} · absent ${esc(prettyDate(f.date))}</span></div><button class="btn ghost" data-act="closereason">Close</button></div>
+    <span class="muted small" style="font-weight:700">Why was ${esc(l.first)} absent?</span>
+    <div class="reasons">${REASONS.filter(r=>!r.late).map(r=>`<button class="reason" data-act="rspick" data-k="${r.key}" aria-pressed="${f.cur===r.key}"><span class="code">${esc(r.code)}</span><span>${esc(r.label)}</span></button>`).join("")}</div>
+    <div class="row"><button class="btn" data-act="rspick" data-k="AB">Still unknown</button><button class="btn" data-act="rspick" data-k="PR">Was present (marked wrong)</button></div>
+  </div></div>`;
+}
+async function saveReason(key){
+  const f=S.reasonForm;if(!f)return;
+  if(S.readOnly){toast("You can view this register but not change it.");return}
+  const c=S.classById[f.classId];const l=c.learners.find(x=>x.id===f.lid);
+  document.querySelectorAll('#overlay [data-act="rspick"]').forEach(b=>b.disabled=true);
+  try{
+    await S.db.doc(`registers/${f.date}_${f.classId}`).update({marks:{[f.lid]:key},reasonLog:{[f.lid]:{was:f.cur||null,by:S.uid||null,at:new Date().toISOString()}}});
+    const reg=S.rs.data&&S.rs.data.regs.find(r=>r.date===f.date&&r.classId===f.classId);if(reg){reg.marks={...reg.marks,[f.lid]:key}}
+    if(f.date===S.date&&S.local[f.classId])S.local[f.classId].marks={...S.local[f.classId].marks,[f.lid]:key};
+    S.reasonForm=null;paintReason();render();
+    toast(key==="PR"?`${learnerName(l)} changed to present.`:key==="AB"?`Left as reason unknown.`:`Reason saved: ${REASON[key].label}.`);
+  }catch(e){document.querySelectorAll('#overlay [data-act="rspick"]').forEach(b=>b.disabled=false);writeErr(e)}
+}
+
+/* ----- SA-SAMS export ----- */
+function viewExport(){
+  const e=S.exp;const wk=weekDates(e.week);
+  const rows=[];S.classes.forEach(c=>{const reg=regFor(c.id);(c.learners||[]).forEach(l=>{const st=dayStatus(l,reg,movesFor(l.id));if(st.kind==="absent"||st.kind==="late")rows.push({c,l,st})})});
+  const notIn=S.classes.filter(c=>regFor(c.id)?.status!=="submitted");
+  return `<div class="panel"><h2>Weekly register for SA-SAMS</h2>
+    <p class="muted small">Downloads an Excel workbook in the same layout as SA-SAMS's Weekly Learner Attendance sheet, one sheet per class. Absent learners get their code, late arrivals get L, and present learners stay blank. Learners signed out during the day stay present.</p>
+    <div class="grid2"><label class="f">Any day in the week<input type="date" id="expWeek" value="${e.week}"></label>
+    <label class="f">Classes<select id="expClass"><option value="all">All classes</option>${S.classes.map(c=>`<option value="${c.id}" ${e.classId===c.id?"selected":""}>${esc(c.name)}</option>`).join("")}</select></label></div>
+    <span class="muted small">Week ${wk[0]} to ${wk[4]}</span>
+    <div class="row"><button class="btn primary" data-act="download" id="dlBtn">Download weekly register</button></div>
+    <div class="note c-info">This file can't go straight into SA-SAMS yet. In the full version it will be matched exactly to the attendance sheet exported from SA-SAMS.</div></div>
+   <div class="panel"><div class="spread"><h3>Today's absentees to capture</h3><button class="btn" data-act="copycap">Copy list</button></div>
+    ${notIn.length?`<div class="banner small">${notIn.length} class register${notIn.length===1?" is":"s are"} not submitted yet: ${esc(notIn.map(c=>c.name).join(", "))}</div>`:""}
+    ${rows.length?`<div class="tablewrap"><table><thead><tr><th>Class</th><th>Acc No</th><th>Learner</th><th>Code</th><th>Reason</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.c.sasams||x.c.name)}</td><td class="code">${esc(x.l.acc||"")}</td><td>${esc(learnerName(x.l,"list"))}</td><td><span class="code">${esc(x.st.code)}</span></td><td>${esc(x.st.kind==="late"?"Late for school":x.st.label)}</td></tr>`).join("")}</tbody></table></div>`:`<span class="muted small">No absences or late arrivals recorded today.</span>`}
+   </div>`;
+}
+async function download(){
+  const btn=document.getElementById("dlBtn");if(btn){btn.disabled=true;btn.textContent="Preparing…"}
+  try{
+    const wk=weekDates(S.exp.week);
+    const [r,m]=await Promise.all([S.db.collection("registers").where("date","in",wk).get(),S.db.collection("movements").where("date","in",wk).get()]);
+    const regs=r.docs.map(d=>d.data()),moves=m.docs.map(d=>d.data());
+    const schoolDays=wk.filter(d=>d<=S.date&&regs.some(x=>x.date===d));
+    const classes=S.exp.classId==="all"?S.classes:S.classes.filter(c=>c.id===S.exp.classId);
+    const wb=XLSX.utils.book_new();const used=new Set();
+    classes.forEach(c=>{
+      const L=c.learners||[];const aoa=[];
+      aoa.push([` ${(S.config.name||"").toUpperCase()}`,"","","","","",` ${S.date.replace(/-/g,"/")}`,""]);
+      aoa.push([" Weekly Learner Attendance","","","","","","",""]);
+      aoa.push([`Week Ending: ${wk[4].replace(/-/g,"/")}, Class: ${c.sasams||c.name}`,"","","","","","",""]);
+      aoa.push(["Acc No","Learner","M/F",...wk.map((d,i)=>`${["Mon","Tue","Wed","Thu","Fri"][i]}\n${d.slice(5,7)}/${d.slice(8)}`)]);
+      aoa.push(["","","","","","","",""]);
+      const g={M:{roll:0,abs:0},F:{roll:0,abs:0},"?":{roll:0,abs:0}};
+      L.forEach(l=>{const gk=l.gender==="M"||l.gender==="F"?l.gender:"?";g[gk].roll++;
+        const cells=wk.map(d=>{const reg=regs.find(x=>x.date===d&&x.classId===c.id);if(!reg)return "";
+          const st=dayStatus(l,reg,moves.filter(x=>x.learnerId===l.id&&x.date===d).sort((a,b)=>a.time.localeCompare(b.time)));
+          if(st.kind==="absent"&&schoolDays.includes(d))g[gk].abs++;return st.code});
+        aoa.push([l.acc||"",`${l.surname}, ${l.first}`,l.gender||"",...cells])});
+      const days=schoolDays.length;
+      aoa.push(["","","","","","","",""]);aoa.push([" ","","","","","","",""]);
+      const cols=["M","F"].concat(g["?"].roll?["?"]:[]);
+      const stat=(lab,f)=>["",lab,"",...cols.map(k=>String(f(g[k]))),"","",""].slice(0,8);
+      aoa.push(["","Weekly Class Statistics","",...cols,"","",""].slice(0,8));
+      aoa.push(stat("Total No of Attendances",x=>x.roll*days-x.abs));
+      aoa.push(stat("Total No of Absentees",x=>x.abs));
+      aoa.push(stat("Possible No of Attendances",x=>x.roll*days));
+      aoa.push(stat("% Attendance",x=>x.roll&&days?Math.round((x.roll*days-x.abs)/(x.roll*days)*100)+"%":"–"));
+      aoa.push(stat("Average on Roll",x=>x.roll));
+      aoa.push(["","Number of School Days in Week",String(days),"","","","",""]);
+      const ws=XLSX.utils.aoa_to_sheet(aoa);
+      const n=aoa.length;
+      ws["!merges"]=[{s:{r:0,c:0},e:{r:0,c:5}},{s:{r:0,c:6},e:{r:0,c:7}},{s:{r:1,c:0},e:{r:1,c:7}},{s:{r:2,c:0},e:{r:2,c:7}}];
+      for(let i=n-7;i<n;i++)ws["!merges"].push({s:{r:i,c:1},e:{r:i,c:2}});
+      ws["!merges"].pop();
+      ws["!cols"]=[{wch:10},{wch:30},{wch:5},{wch:8},{wch:8},{wch:8},{wch:8},{wch:8}];
+      let nm=(c.sasams||c.name).replace(/[\\\/\?\*\[\]:]/g,"-").slice(0,31);while(used.has(nm))nm=nm.slice(0,28)+"-"+used.size;used.add(nm);
+      XLSX.utils.book_append_sheet(wb,ws,nm);
+    });
+    const buf=XLSX.write(wb,{bookType:"xlsx",type:"array"});
+    const fname=`Weekly register ${wk[4]}${S.exp.classId==="all"?"":" "+(S.classById[S.exp.classId].sasams||S.classById[S.exp.classId].name)}.xlsx`;
+    const dl=await claude.use("downloads");
+    if(!dl){toast("Downloading isn't available in this browser.");return}
+    try{await dl.save({filename:fname,data:new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})});toast("Weekly register downloaded.")}
+    catch(e){if(e&&e.code!=="declined")toast("The download didn't go through. Try again.")}
+  }catch(e){toast("Couldn't build the file. Check your connection and try again.")}
+  finally{const b=document.getElementById("dlBtn");if(b){b.disabled=false;b.textContent="Download weekly register"}}
+}
+function copyCapture(){
+  const lines=[["Class","Acc No","Learner","Code","Reason"].join("\t")];
+  S.classes.forEach(c=>{const reg=regFor(c.id);(c.learners||[]).forEach(l=>{const st=dayStatus(l,reg,movesFor(l.id));if(st.kind==="absent"||st.kind==="late")lines.push([c.sasams||c.name,l.acc||"",learnerName(l,"list"),st.code,st.kind==="late"?"Late for school":st.label].join("\t"))})});
+  const text=lines.join("\n");
+  navigator.clipboard.writeText(text).then(()=>toast("Copied. Paste it into Excel or a message."),()=>toast("Couldn't copy. Select the table and copy it instead."));
+}
+
+/* ----- Setup (owner) ----- */
+function viewSetup(){
+  const su=S.setup;
+  let h=`<div class="panel"><h2>School</h2><label class="f">School name<input type="text" id="schoolNameIn" value="${esc(S.config.name||"")}"></label><div class="row"><button class="btn" data-act="saveschool">Save name</button></div></div>
+  <div class="panel"><h2>Update a class from SA-SAMS</h2><p class="muted small">Upload the Weekly Learner Attendance sheet SA-SAMS prints for a class (.xls). The register picks the matching class, takes its SA-SAMS class name, and fills in each learner's Acc No and M/F. Learners on the sheet who aren't in the class yet get added.</p>
+   <input type="file" id="sasamsFile" accept=".xls,.xlsx">
+   ${su.upload?uploadPreview():""}</div>
+  <div class="panel"><div class="spread"><h2>Classes and learners</h2><button class="btn" data-act="addclass">Add class</button></div>
+   <label class="f">Class<select id="setupClass"><option value="">Choose a class…</option>${S.classes.map(c=>`<option value="${c.id}" ${su.classId===c.id?"selected":""}>${esc(c.dept?c.dept+" · ":"")}${esc(c.name)} (${(c.learners||[]).length})</option>`).join("")}</select></label>`;
+  const e=su.edit;
+  if(e){
+    h+=`<div class="grid2"><label class="f">Class name<input type="text" id="se-name" value="${esc(e.name)}"></label><label class="f">SA-SAMS class name<input type="text" id="se-sasams" value="${esc(e.sasams||"")}" placeholder="e.g. J2"></label><label class="f">Department<input type="text" id="se-dept" value="${esc(e.dept||"")}"></label></div>
+    <div class="setuprow muted small" style="font-weight:700"><span>Surname</span><span>First name</span><span>Called</span><span>Acc No</span><span>M/F</span><span></span></div>
+    ${e.learners.map((l,i)=>`<div class="setuprow"><input type="text" id="sl-${i}-surname" value="${esc(l.surname)}" aria-label="Surname"><input type="text" id="sl-${i}-first" value="${esc(l.first)}" aria-label="First name"><input type="text" id="sl-${i}-nick" value="${esc(l.nick||"")}" aria-label="Called"><input type="text" id="sl-${i}-acc" value="${esc(l.acc||"")}" aria-label="Acc No"><select id="sl-${i}-gender" aria-label="M/F"><option value="">?</option><option ${l.gender==="M"?"selected":""}>M</option><option ${l.gender==="F"?"selected":""}>F</option></select><button class="btn ghost" data-act="rmlearner" data-i="${i}">Remove</button></div>`).join("")}
+    <div class="row"><button class="btn" data-act="addlearner">Add learner</button><button class="btn primary" data-act="saveclass">Save class</button><button class="btn ghost" data-act="canceledit">Cancel</button></div>`;
+  }
+  return h+`</div>`;
+}
+function norm(s){return String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().replace(/[^A-Z]/g,"")}
+function firstTok(s){return norm(String(s||"").trim().split(/\s+/)[0])}
+async function parseSasams(file){
+  const buf=await file.arrayBuffer();const wb=XLSX.read(buf,{type:"array"});const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:""});
+  let cls="";const learners=[];
+  rows.forEach(r=>{const a=String(r[0]||"").trim(),b=String(r[1]||"").trim();
+    const m=r.join(" ").match(/Class:\s*([^,]+?)\s*$/);if(m&&!cls)cls=m[1].trim();
+    if(/^\d{3,}$/.test(a)&&b.includes(",")){const [sur,...rest]=b.split(",");learners.push({acc:a,surname:sur.trim().toUpperCase(),first:rest.join(",").trim(),gender:String(r[2]||"").trim().toUpperCase()})}});
+  let best=null;
+  S.classes.forEach(c=>{let n=0;learners.forEach(x=>{if((c.learners||[]).some(l=>norm(l.surname)===norm(x.surname)&&(norm(l.first)===norm(x.first)||firstTok(l.first)===firstTok(x.first))))n++});if(!best||n>best.n)best={c,n}});
+  S.setup.upload={file:file.name,cls,learners,classId:best&&best.n?best.c.id:(S.classes.find(c=>norm(c.sasams)===norm(cls))?.id||"")};
+  render.force=true;render();
+}
+function uploadPreview(){
+  const u=S.setup.upload;const c=S.classById[u.classId];
+  if(!u.learners.length) return `<div class="banner">No learners found in ${esc(u.file)}. Use the Weekly Learner Attendance sheet from SA-SAMS.</div>`;
+  let matched=0,added=[],missing=[];
+  if(c){u.learners.forEach(x=>{if(c.learners.some(l=>norm(l.surname)===norm(x.surname)&&(norm(l.first)===norm(x.first)||firstTok(l.first)===firstTok(x.first))))matched++;else added.push(x)});
+    missing=c.learners.filter(l=>!u.learners.some(x=>norm(l.surname)===norm(x.surname)&&(norm(l.first)===norm(x.first)||firstTok(l.first)===firstTok(x.first))))}
+  return `<div class="note c-info">${esc(u.file)}: SA-SAMS class <b>${esc(u.cls||"?")}</b>, ${u.learners.length} learners.</div>
+   <label class="f">Apply to class<select id="upClass"><option value="">Choose…</option>${S.classes.map(x=>`<option value="${x.id}" ${x.id===u.classId?"selected":""}>${esc(x.name)}</option>`).join("")}</select></label>
+   ${c?`<ul class="small"><li>${matched} learners matched: Acc No and M/F will be filled in</li>${added.length?`<li>${added.length} new learner${added.length===1?"":"s"} will be added: ${esc(added.map(x=>`${x.surname}, ${x.first}`).join("; "))}</li>`:""}${missing.length?`<li>${missing.length} learner${missing.length===1?" is":"s are"} in the class but not on this sheet, and will be kept: ${esc(missing.map(l=>learnerName(l,"list")).join("; "))}</li>`:""}</ul>
+   <div class="row"><button class="btn primary" data-act="applyupload">Update ${esc(c.name)}</button><button class="btn ghost" data-act="cancelupload">Cancel</button></div>`:""}`;
+}
+async function applyUpload(){
+  const u=S.setup.upload;const c=S.classById[u.classId];if(!c)return;
+  const learners=c.learners.map(l=>({...l}));let n=learners.length;
+  u.learners.forEach(x=>{const l=learners.find(l=>norm(l.surname)===norm(x.surname)&&(norm(l.first)===norm(x.first)||firstTok(l.first)===firstTok(x.first)));
+    if(l){l.acc=x.acc;if(x.gender==="M"||x.gender==="F")l.gender=x.gender}
+    else learners.push({id:`${c.id}-${(++n).toString().padStart(2,"0")}-${x.acc}`,surname:x.surname,first:x.first,nick:null,acc:x.acc,gender:x.gender==="M"||x.gender==="F"?x.gender:""})});
+  learners.sort((a,b)=>a.surname.localeCompare(b.surname)||a.first.localeCompare(b.first));
+  const {id,...rest}=c;
+  try{await S.db.doc(`classes/${c.id}`).set({...rest,sasams:u.cls||c.sasams||"",learners});S.setup.upload=null;render.force=true;render();toast(`${c.name} updated from SA-SAMS.`)}catch(e){writeErr(e)}
+}
+function syncSetupInputs(){
+  const e=S.setup.edit;if(!e)return;
+  const v=id=>{const el=document.getElementById(id);return el?el.value:undefined};
+  if(v("se-name")!=null)e.name=v("se-name");if(v("se-sasams")!=null)e.sasams=v("se-sasams");if(v("se-dept")!=null)e.dept=v("se-dept");
+  e.learners.forEach((l,i)=>["surname","first","nick","acc","gender"].forEach(k=>{const x=v(`sl-${i}-${k}`);if(x!=null)l[k]=x}));
+}
+async function saveClass(){
+  syncSetupInputs();const e=S.setup.edit;
+  const learners=e.learners.filter(l=>(l.surname||"").trim()||(l.first||"").trim()).map(l=>({...l,surname:l.surname.trim().toUpperCase(),first:l.first.trim(),nick:(l.nick||"").trim()||null,acc:(l.acc||"").trim()||null}));
+  learners.sort((a,b)=>a.surname.localeCompare(b.surname)||a.first.localeCompare(b.first));
+  if(!e.name.trim()){toast("Give the class a name first.");return}
+  const {id,...rest}=e;
+  try{await S.db.doc(`classes/${id}`).set({...rest,name:e.name.trim(),sasams:(e.sasams||"").trim(),dept:(e.dept||"").trim(),learners});S.setup.edit=null;render.force=true;render();toast("Class saved.")}catch(err){writeErr(err)}
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click",ev=>{
+  const t=ev.target.closest("[data-act]");if(!t)return;
+  if((t.dataset.act==="closeoffice"||t.dataset.act==="closereason")&&ev.target.closest("[data-stop]")&&!t.matches("button"))return;
+  const a=t.dataset.act;
+  switch(a){
+    case "tab":S.tab=t.dataset.k;ls.set("reg-tab",S.tab);render.force=true;render();window.scrollTo(0,0);if(S.tab==="reasons"&&!S.rs.data&&!S.rs.loading&&S.db)loadReasons();break;
+    case "loadreasons":S.rs.failed=false;loadReasons();break;
+    case "rsonly":S.rs.onlyPending=t.dataset.k==="1";loadReasons();break;
+    case "rsopen":{const reg=S.rs.data.regs.find(r=>r.date===t.dataset.d&&r.classId===t.dataset.c);S.reasonForm={date:t.dataset.d,classId:t.dataset.c,lid:t.dataset.l,cur:reg?.marks?.[t.dataset.l]||null};paintReason();break}
+    case "closereason":S.reasonForm=null;paintReason();break;
+    case "rspick":saveReason(t.dataset.k);break;
+    case "pickclass":S.myClass=t.dataset.id;S.picker=false;saveMine();render();window.scrollTo({top:0});break;
+    case "changeclass":S.picker=true;render();window.scrollTo({top:0});break;
+    case "closepicker":S.picker=false;render();break;
+    case "mark":{const c=S.classById[S.myClass];const i=S.cardIdx[c.id];const l=c.learners[i];setMark(c.id,l.id,t.dataset.k);
+      const reg=regFor(c.id);const nextI=c.learners.findIndex((x,j)=>j>i&&!reg.marks[x.id]);
+      if(nextI>=0)S.cardIdx[c.id]=nextI;else{const anyI=c.learners.findIndex(x=>!reg.marks[x.id]);if(anyI>=0)S.cardIdx[c.id]=anyI;else S.regMode[c.id]="summary"}
+      render();window.scrollTo({top:0});break}
+    case "prev":S.cardIdx[S.myClass]--;render();break;
+    case "next":S.cardIdx[S.myClass]++;render();break;
+    case "review":S.regMode[S.myClass]="summary";render();break;
+    case "cards":S.regMode[S.myClass]="cards";render();break;
+    case "jump":S.cardIdx[S.myClass]=+t.dataset.i;S.regMode[S.myClass]="cards";render();window.scrollTo({top:0});break;
+    case "editreg":S.regMode[S.myClass]="summary";{const r=regFor(S.myClass);S.local[S.myClass]={...r,status:"draft",_dirty:true};flushReg(S.myClass)}render();break;
+    case "submit":{const cid=S.myClass;const base=regFor(cid);S.local[cid]={...base,status:"submitted",submittedAt:new Date().toISOString(),submittedTime:nowTime(),by:S.uid||null,_dirty:true};flushReg(cid);S.regMode[cid]="summary";render();toast("Register submitted. The office can see it now.");break}
+    case "seen":S.moves.filter(m=>m.classId===S.myClass).forEach(m=>S.seen.add(m.id));ls.set("reg-seen",[...S.seen].slice(-500));render();break;
+    case "expand":S.expanded=S.expanded===t.dataset.id?null:t.dataset.id;render();break;
+    case "office":openOffice(t.dataset.c,t.dataset.l);break;
+    case "closeoffice":S.officeForm=null;paintOffice();break;
+    case "otype":S.officeForm.type=t.dataset.k;S.officeForm.reason="";paintOffice();break;
+    case "oreason":S.officeForm.reason=t.dataset.k;paintOffice();break;
+    case "osave":saveOffice();break;
+    case "loadlog":loadLog();break;
+    case "logclass":S.log.classId=t.dataset.id;S.log.learner="";S.log.data=null;loadLog();window.scrollTo({top:0});break;
+    case "download":download();break;
+    case "copycap":copyCapture();break;
+    case "saveschool":{const v=document.getElementById("schoolNameIn").value.trim();S.db.doc("config/school").set({...S.config,name:v}).then(()=>toast("Saved."),writeErr);break}
+    case "addclass":{const id="class-"+Date.now().toString(36);S.setup.classId=id;S.setup.edit={id,name:"New class",sasams:"",dept:"",order:99,learners:[]};render.force=true;render();break}
+    case "addlearner":syncSetupInputs();{const e=S.setup.edit;e.learners.push({id:`${e.id}-${Date.now().toString(36)}`,surname:"",first:"",nick:null,acc:null,gender:""})}render.force=true;render();break;
+    case "rmlearner":syncSetupInputs();S.setup.edit.learners.splice(+t.dataset.i,1);render.force=true;render();break;
+    case "saveclass":saveClass();break;
+    case "canceledit":S.setup.edit=null;S.setup.classId=null;render.force=true;render();break;
+    case "applyupload":applyUpload();break;
+    case "cancelupload":S.setup.upload=null;render.force=true;render();break;
+  }
+});
+document.addEventListener("input",ev=>{
+  const id=ev.target.id;
+  if(id==="ovSearch"){S.search=ev.target.value;render()}
+  else if(id==="oTime")S.officeForm.time=ev.target.value;
+  else if(id==="oBy")S.officeForm.collectedBy=ev.target.value;
+  else if(id==="oNote")S.officeForm.note=ev.target.value;
+});
+document.addEventListener("change",ev=>{
+  const id=ev.target.id,v=ev.target.value;
+  if(id==="rsClass"){S.rs.classId=v;render()}
+  else if(id==="rsFrom"){S.rs.from=v;loadReasons()}else if(id==="rsTo"){S.rs.to=v;loadReasons()}
+  else if(id==="logClass"){S.log.classId=v;S.log.learner="";S.log.data=null;render()}
+  else if(id==="logFrom")S.log.from=v;else if(id==="logTo")S.log.to=v;
+  else if(id==="logLearner"){S.log.learner=v;render()}
+  else if(id==="expWeek"){S.exp.week=v||S.date;render()}
+  else if(id==="expClass")S.exp.classId=v;
+  else if(id==="setupClass"){S.setup.classId=v;const c=S.classById[v];S.setup.edit=c?JSON.parse(JSON.stringify({...c,learners:c.learners||[]})):null;render.force=true;render()}
+  else if(id==="sasamsFile"&&ev.target.files[0]){parseSasams(ev.target.files[0]).catch(()=>toast("Couldn't read that file. Use the .xls sheet from SA-SAMS."))}
+  else if(id==="upClass"){S.setup.upload.classId=v;render.force=true;render()}
+  else if(id&&(id.startsWith("se-")||id.startsWith("sl-")))syncSetupInputs();
+});
+document.addEventListener("keydown",ev=>{if(ev.key==="Escape"&&S.officeForm){S.officeForm=null;paintOffice()}if(ev.key==="Escape"&&S.reasonForm){S.reasonForm=null;paintReason()}});
+
+/* ---------- boot ---------- */
+paintHeader();
+(async()=>{
+  if(!window.claude||!claude.use){render();return}
+  const [db,user]=await Promise.all([claude.use("db"),claude.use("user")]);
+  S.db=db;S.user=user;
+  if(user){try{S.uid=await user.id()}catch(e){}try{S.isOwner=await user.isOwner()}catch(e){}
+    try{const w=await user.can("data.write");if(w===false)S.readOnly=true}catch(e){}}
+  if(!db){render();return}
+  subscribe();render();
+})();
+</script>
+
+</body>
+</html>

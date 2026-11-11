@@ -145,7 +145,7 @@ td.num,th.num{text-align:right}
 
 </head>
 <body>
-<div class="proto" role="note"><div><span><b>Prototype demo.</b> All learners are fictional. Changes are saved only in this browser.</span><button type="button" onclick="demoReset()">Reset demo data</button></div></div>
+<div class="proto" role="note"><div><span><b>Prototype demo.</b> Real attendance records; learner names are invented. Changes are saved only in this browser.</span><button type="button" onclick="demoReset()">Reset demo data</button></div></div>
 <header>
   <div class="top"><h1 id="schoolName">Daily Register</h1><span class="date" id="todayLabel"></span></div>
   <nav id="tabs" aria-label="Sections"></nav>
@@ -207,6 +207,7 @@ if(!Array.isArray(S.myClasses))S.myClasses=S.myClass?[S.myClass]:[];
 function saveMine(){ls.set("reg-myclasses",S.myClasses);ls.set("reg-myclass",S.myClass)}
 /* ---------- helpers ---------- */
 function learnerName(l,style){
+  if(l.label) return l.label;
   const sur=l.surname||"",first=l.first||"",nick=l.nick?` (${l.nick})`:"";
   if(style==="list") return `${sur}, ${first}${nick}`;
   const surTitle=sur.toLowerCase().replace(/(^|[\s\-'])\p{L}/gu,m=>m.toUpperCase());
@@ -633,7 +634,7 @@ async function download(){
         const cells=wk.map(d=>{const reg=regs.find(x=>x.date===d&&x.classId===c.id);if(!reg)return "";
           const st=dayStatus(l,reg,moves.filter(x=>x.learnerId===l.id&&x.date===d).sort((a,b)=>a.time.localeCompare(b.time)));
           if(st.kind==="absent"&&schoolDays.includes(d))g[gk].abs++;return st.code});
-        aoa.push([l.acc||"",`${l.surname}, ${l.first}`,l.gender||"",...cells])});
+        aoa.push([l.acc||"",l.label||`${l.surname}, ${l.first}`,l.gender||"",...cells])});
       const days=schoolDays.length;
       aoa.push(["","","","","","","",""]);aoa.push([" ","","","","","","",""]);
       const cols=["M","F"].concat(g["?"].roll?["?"]:[]);
@@ -731,7 +732,7 @@ function syncSetupInputs(){
 }
 async function saveClass(){
   syncSetupInputs();const e=S.setup.edit;
-  const learners=e.learners.filter(l=>(l.surname||"").trim()||(l.first||"").trim()).map(l=>({...l,surname:l.surname.trim().toUpperCase(),first:l.first.trim(),nick:(l.nick||"").trim()||null,acc:(l.acc||"").trim()||null}));
+  const learners=e.learners.filter(l=>(l.surname||"").trim()||(l.first||"").trim()||l.label).map(l=>({...l,surname:l.surname.trim().toUpperCase(),first:l.first.trim(),nick:(l.nick||"").trim()||null,acc:(l.acc||"").trim()||null}));
   learners.sort((a,b)=>a.surname.localeCompare(b.surname)||a.first.localeCompare(b.first));
   if(!e.name.trim()){toast("Give the class a name first.");return}
   const {id,...rest}=e;

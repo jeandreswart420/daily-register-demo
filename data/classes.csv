@@ -1,0 +1,23 @@
+class_id,class_name,sasams_class,department,order
+MID-year-1,Year 1,,MID,1
+MID-year-2,Year 2,J2,MID,2
+MID-year-3a,Year 3A,,MID,3
+MID-year-3b,Year 3B,,MID,4
+MID-year-4,Year 4,,MID,5
+SID-grade-4-1a,Grade 4.1A,,SID,1
+SID-grade-4-1c,Grade 4.1C,,SID,2
+SID-grade-4y2a,Grade 4Y2A,,SID,3
+SID-grade-4y2b,Grade 4Y2B,,SID,4
+SID-grade-4y2c,Grade 4Y2C,,SID,5
+SID-grade-5y1a,Grade 5Y1A,,SID,6
+SID-grade-5y1b,Grade 5Y1B,,SID,7
+SID-grade-5y1c,Grade 5Y1C,,SID,8
+SID-grade-5y1d,Grade 5Y1D,,SID,9
+SID-grade-5y1e,Grade 5Y1E,,SID,10
+SID-grade-5y2a,Grade 5Y2A,,SID,11
+SID-grade-5y2b,Grade 5Y2B,,SID,12
+SID-grade-5y2c,Grade 5Y2C,,SID,13
+SID-grade-5y2d,Grade 5Y2D,,SID,14
+SID-grade-5y3a,Grade 5Y3A,,SID,15
+SID-grade-5y3b,Grade 5Y3B,,SID,16
+SID-grade-5y3c,Grade 5Y3C,,SID,17

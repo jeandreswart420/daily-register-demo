@@ -1,85 +1,84 @@
 /*
  * Daily Register prototype: local demo runtime.
  *
- * The original app runs inside Claude and keeps its data in a shared online store.
- * This file stands in for that store so the prototype runs as a plain website:
- * everything is saved in this browser only (localStorage) and is filled with
- * FICTIONAL demonstration learners. No real learner information is included.
+ * The original app keeps its data in a shared online store. This file stands in for
+ * that store so the prototype runs as a plain website. It loads the anonymised CSV
+ * snapshot in /data (real learner names and Acc Nos removed; each learner has an invented name) and keeps any changes in this browser only (localStorage).
  */
 (function () {
   "use strict";
-  var KEY = "daily-register-demo-v1";
+  var KEY = "daily-register-demo-v2";
   var TZ = "Africa/Johannesburg";
 
-  /* ---------- storage ---------- */
-  var mem = null;
-  function load() {
-    if (mem) return mem;
-    try { mem = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { mem = null; }
-    if (!mem || !mem.docs) { mem = { docs: seed() }; persist(); }
-    return mem;
-  }
+  /* ---------- storage ----------
+   * Base data comes from the CSV files in /data (a snapshot of the school's real
+   * registers; learners carry invented names and no Acc Nos). Changes made in the demo are
+   * kept in this browser only, on top of that snapshot. */
+  var DATA_FILES = ["classes", "learners", "registers", "movements"];
+  var mem = null, ready = null;
   function persist() { try { localStorage.setItem(KEY, JSON.stringify(mem)); } catch (e) {} }
   var clone = function (v) { return v == null ? v : JSON.parse(JSON.stringify(v)); };
+  function load() { return mem; }
 
-  /* ---------- fictional seed data ---------- */
-  function rng(seed) { return function () { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; }; }
-  function seed() {
-    var r = rng(20261111), pick = function (a) { return a[Math.floor(r() * a.length)]; };
-    var boys = ["Thabo", "Sipho", "Kagiso", "Lebo", "Neo", "Tumelo", "Pieter", "Johan", "Ruan", "Kabelo", "Tshepo", "Lwazi", "Bongani", "Mpho", "Daniel", "Liam", "Karabo", "Themba", "Wian", "Jaco"];
-    var girls = ["Naledi", "Palesa", "Lerato", "Anika", "Zanele", "Mia", "Refilwe", "Ayanda", "Thandi", "Elna", "Nomsa", "Keabetswe", "Chante", "Precious", "Lindiwe", "Marike", "Dineo", "Kamogelo", "Busisiwe", "Karien"];
-    var sur = ["MOLOI", "NKOSI", "VAN WYK", "MOKOENA", "DLAMINI", "BOTHA", "MAHLANGU", "KHUMALO", "NAUDE", "SITHOLE", "MOTAUNG", "PRETORIUS", "RADEBE", "MOLEFE", "DU PLESSIS", "TSHABALALA", "COETZEE", "MASHABA", "LOUW", "MOSIA", "NDLOVU", "STEYN", "MOTLOUNG", "FOURIE"];
-    var classes = [["MID", "Year 1", "J1", 16], ["MID", "Year 2", "J2", 18], ["MID", "Year 3", "J3", 14], ["SID", "Grade 4A", "S4A", 15], ["SID", "Grade 5A", "S5A", 17], ["SID", "Grade 5B", "S5B", 13]];
-    var docs = {}, acc = 4100, order = {};
+  function parseCSV(text) {
+    var rows = [], row = [], f = "", q = false, i, c;
+    for (i = 0; i < text.length; i++) {
+      c = text[i];
+      if (q) { if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+      else if (c === '"') q = true;
+      else if (c === ",") { row.push(f); f = ""; }
+      else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(f); f = ""; if (row.length > 1 || row[0] !== "") rows.push(row); row = []; }
+      else f += c;
+    }
+    if (f !== "" || row.length) { row.push(f); rows.push(row); }
+    var head = rows.shift() || [];
+    return rows.map(function (r) { var o = {}; head.forEach(function (h, j) { o[h] = r[j] == null ? "" : r[j]; }); return o; });
+  }
+  function fetchCSV(name) {
+    return fetch("data/" + name + ".csv", { cache: "no-cache" }).then(function (r) {
+      if (!r.ok) throw new Error("Couldn't load data/" + name + ".csv (" + r.status + ")");
+      return r.text();
+    }).then(function (t) { return { name: name, text: t }; });
+  }
+  function hash(str) { var h = 5381; for (var i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return String(h >>> 0); }
+
+  function build(t) {
+    var docs = {}, classes = parseCSV(t.classes), learners = parseCSV(t.learners);
     classes.forEach(function (c) {
-      var id = (c[0] + "-" + c[1]).toLowerCase().replace(/[^a-z0-9]+/g, "-");
-      order[c[0]] = (order[c[0]] || 0) + 1;
-      var used = {}, learners = [];
-      for (var i = 0; i < c[3]; i++) {
-        var g = r() < 0.55 ? "M" : "F", first, s, k;
-        do { first = pick(g === "M" ? boys : girls); s = pick(sur); k = s + first; } while (used[k]);
-        used[k] = 1;
-        learners.push({ surname: s, first: first, nick: null, acc: String(acc += 1 + Math.floor(r() * 7)), gender: g });
-      }
-      learners.sort(function (a, b) { return a.surname.localeCompare(b.surname) || a.first.localeCompare(b.first); });
-      learners.forEach(function (l, i) { l.id = id + "-" + String(i + 1).padStart(2, "0"); });
-      docs["classes/" + id] = { name: c[1], sasams: c[2], dept: c[0], order: order[c[0]], learners: learners };
+      docs["classes/" + c.class_id] = {
+        name: c.class_name, sasams: c.sasams_class, dept: c.department, order: Number(c.order) || 0,
+        learners: learners.filter(function (l) { return l.class_id === c.class_id; })
+          .map(function (l) { return { id: l.learner_id, surname: l.surname, first: l.first_name, nick: null, acc: null, gender: l.gender }; })
+          .sort(function (a, b) { return a.surname.localeCompare(b.surname) || a.first.localeCompare(b.first); })
+      };
     });
-    docs["config/school"] = { name: "Demo School (prototype)" };
-
-    /* about two weeks of past registers, so the log, rankings and reasons have something to show */
-    var days = [], d = new Date();
-    while (days.length < 9) { d = new Date(d.getTime() - 86400000); var dow = new Date(d.toLocaleDateString("en-CA", { timeZone: TZ }) + "T12:00:00Z").getUTCDay(); if (dow > 0 && dow < 6) days.push(d.toLocaleDateString("en-CA", { timeZone: TZ })); }
-    var common = ["S", "S", "A", "MA", "T", "FR", "S", "EC", "LF"];
-    var outReasons = ["Collected by parent/guardian", "Sick – sent home", "Medical appointment"];
-    var mv = 0;
-    days.forEach(function (date, di) {
-      Object.keys(docs).filter(function (k) { return k.indexOf("classes/") === 0; }).forEach(function (k) {
-        var cid = k.slice(8), c = docs[k], marks = {};
-        var classBias = { "mid-year-1": 0.04, "mid-year-2": 0.08, "mid-year-3": 0.05, "sid-grade-4a": 0.11, "sid-grade-5a": 0.06, "sid-grade-5b": 0.09 }[cid] || 0.07;
-        c.learners.forEach(function (l, li) {
-          var x = r(), p = classBias + (li % 7 === 3 ? 0.12 : 0);
-          if (x < p) marks[l.id] = di < 3 && r() < 0.6 ? "AB" : pick(common);
-          else if (x < p + 0.03) marks[l.id] = "L";
-          else marks[l.id] = "PR";
-          if (marks[l.id] === "PR" && r() < 0.025) {
-            docs["movements/demo" + (++mv)] = { date: date, classId: cid, learnerId: l.id, type: "out", time: "1" + Math.floor(r() * 3) + ":" + pick(["05", "20", "40", "55"]), reason: pick(outReasons), collectedBy: "Parent", note: "", at: date + "T10:00:00Z", by: "demo-office" };
-          }
-          if (marks[l.id] === "L") {
-            docs["movements/demo" + (++mv)] = { date: date, classId: cid, learnerId: l.id, type: "in", time: "08:" + pick(["10", "25", "40"]), reason: pick(["Transport late", "No valid reason", "Medical appointment"]), collectedBy: "", note: "", at: date + "T06:30:00Z", by: "demo-office" };
-            marks[l.id] = "PR";
-          }
-        });
-        docs["registers/" + date + "_" + cid] = { date: date, classId: cid, status: "submitted", marks: marks, submittedTime: "07:5" + Math.floor(r() * 9), by: "demo-teacher", updatedAt: date + "T05:55:00Z" };
-      });
+    parseCSV(t.registers).forEach(function (r) {
+      var k = "registers/" + r.date + "_" + r.class_id;
+      var d = docs[k] || (docs[k] = { date: r.date, classId: r.class_id, status: r.register_status || "submitted", submittedTime: r.submitted_time, marks: {} });
+      d.marks[r.learner_id] = r.mark;
     });
+    parseCSV(t.movements).forEach(function (m, i) {
+      docs["movements/csv" + i] = { date: m.date, classId: m.class_id, learnerId: m.learner_id, type: m.type, time: m.time, reason: m.reason, note: "", collectedBy: "", at: m.date + "T" + m.time + ":00+02:00", by: "snapshot" };
+    });
+    docs["config/school"] = { name: "Johan Slabbert School" };
     return docs;
   }
+  function init() {
+    return Promise.all(DATA_FILES.map(fetchCSV)).then(function (list) {
+      var t = {}; list.forEach(function (x) { t[x.name] = x.text; });
+      var version = hash(DATA_FILES.map(function (n) { return t[n]; }).join("|"));
+      var saved = null;
+      try { saved = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) {}
+      if (saved && saved.version === version && saved.docs) mem = saved;
+      else { mem = { version: version, docs: build(t) }; persist(); }
+    });
+  }
+  ready = init();
 
   /* ---------- tiny document store with the same calls the app uses ---------- */
   var subs = [];
   function notify() { subs.slice().forEach(function (f) { try { f(); } catch (e) { console.error(e); } }); }
-  window.addEventListener("storage", function (e) { if (e.key === KEY) { mem = null; notify(); } });
+  window.addEventListener("storage", function (e) { if (e.key === KEY) { try { mem = JSON.parse(e.newValue) || mem; } catch (x) {} notify(); } });
 
   function test(doc, w) {
     var x = doc[w[0]], v = w[2];
@@ -143,6 +142,9 @@
     }
   };
 
-  window.claude = { use: function (name) { return Promise.resolve({ db: db, user: user, downloads: downloads }[name] || null); } };
-  window.demoReset = function () { try { localStorage.removeItem(KEY); } catch (e) {} mem = null; location.reload(); };
+  window.claude = { use: function (name) {
+    return ready.then(function () { return { db: db, user: user, downloads: downloads }[name] || null; },
+      function (e) { console.error(e); var m = document.getElementById("app"); if (m) m.innerHTML = '<div class="panel"><h2>The demo data didn\'t load</h2><p class="muted">' + String(e.message || e).replace(/</g, "&lt;") + '. Reload the page to try again.</p></div>'; return null; });
+  } };
+  window.demoReset = function () { try { localStorage.removeItem(KEY); } catch (e) {} location.reload(); };
 })();
